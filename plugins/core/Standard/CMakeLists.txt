@@ -1,3 +1,4 @@
+add_subdirectory( LmiTiffBmpPlugin )
 add_subdirectory( qAnimation )
 add_subdirectory( qBroom )
 add_subdirectory( qCanupo )

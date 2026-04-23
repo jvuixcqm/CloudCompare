@@ -1,0 +1,10 @@
+{
+    "name": "LmiTiffBmpPlugin",
+    "description": "加载 TIFF/BMP 文件并以高程点云、纹理平面或体积点云三种模式进行三维显示",
+    "version": "1.6.0",
+    "maintainer_name": "",
+    "maintainer_email": "",
+    "url": "",
+    "icon": ":/CC/plugin/LmiTiffBmpPlugin/icon.png",
+    "type": "Standard"
+}
