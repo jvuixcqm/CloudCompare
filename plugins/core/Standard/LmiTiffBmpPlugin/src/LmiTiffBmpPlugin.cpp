@@ -4,6 +4,7 @@
 
 #include <ccMainAppInterface.h>
 #include <ccHObject.h>
+#include <ccGLWindowInterface.h>
 
 #include <QAction>
 #include <QDockWidget>
@@ -42,6 +43,15 @@ void LmiTiffBmpPlugin::showPanel()
             Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
         m_app->getMainWindow()->addDockWidget(
             Qt::RightDockWidgetArea, m_dock);
+
+        // 首次打开面板时设置 GL 视口默认行为：
+        //   关闭"自动选择旋转中心"（由用户双击手动设置）
+        //   关闭旋转轴图标显示
+        if (auto* glw = m_app->getActiveGLWindow()) {
+            glw->setAutoPickPivotAtCenter(false);
+            glw->setPivotVisibility(ccGLWindowInterface::PIVOT_HIDE);
+            glw->redraw();
+        }
     }
     m_dock->show();
     m_dock->raise();

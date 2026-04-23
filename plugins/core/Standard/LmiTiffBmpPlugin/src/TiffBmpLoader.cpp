@@ -709,7 +709,7 @@ ccHObject* load(
     const auto& lut   = colorLUT();
 
     // ── 分配点云 ──────────────────────────────────────────────────────────
-    ccPointCloud* cloud = new ccPointCloud(QFileInfo(tiffPath).baseName(), cloudUID);
+    ccPointCloud* cloud = new ccPointCloudNoBB(QFileInfo(tiffPath).baseName(), cloudUID);
     if (!cloud->reserve(static_cast<unsigned>(validCount))) {
         delete cloud;
         if (outError) *outError =
@@ -846,7 +846,7 @@ ccHObject* load(
 
     if (nTris == 0) return cloud;
 
-    ccMesh* mesh = new ccMesh(cloud, meshUID);
+    ccMesh* mesh = new ccMeshNoBB(cloud, meshUID);
     mesh->setName(cloud->getName());
     mesh->addChild(cloud);
     cloud->setEnabled(false);

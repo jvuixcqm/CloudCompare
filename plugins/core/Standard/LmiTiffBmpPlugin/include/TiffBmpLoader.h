@@ -3,6 +3,20 @@
 #include <QString>
 #include <QVector>
 #include <ccHObject.h>
+#include <ccPointCloud.h>
+#include <ccMesh.h>
+
+class ccPointCloudNoBB : public ccPointCloud {
+public:
+    using ccPointCloud::ccPointCloud;
+    void drawBB(CC_DRAW_CONTEXT&, const ccColor::Rgb&) override {}
+};
+class ccMeshNoBB : public ccMesh {
+public:
+    explicit ccMeshNoBB(ccGenericPointCloud* vertices, unsigned uniqueID = 0)
+        : ccMesh(vertices, uniqueID) {}
+    void drawBB(CC_DRAW_CONTEXT&, const ccColor::Rgb&) override {}
+};
 
 //! 显示模式
 enum class DisplayMode {

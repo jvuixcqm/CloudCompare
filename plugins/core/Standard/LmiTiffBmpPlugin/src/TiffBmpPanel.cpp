@@ -66,6 +66,18 @@ static QString pluginSettingsPath()
          + "/LmiTiffBmpPlugin.ini";
 }
 
+// 文件名显示：每 kLineLen 字符强制插入换行，行数不限
+static QString truncatedFnLabel(const QString& name)
+{
+    constexpr int kLineLen = 40;
+    QString result;
+    for (int i = 0; i < name.length(); i += kLineLen) {
+        if (!result.isEmpty()) result += '\n';
+        result += name.mid(i, kLineLen);
+    }
+    return result;
+}
+
 static QSettings& panelSettings()
 {
     static QSettings s(pluginSettingsPath(), QSettings::IniFormat);
@@ -100,12 +112,13 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
             this, &TiffBmpPanel::onAsyncLoadFinished);
 
     // ── 当前文件名显示 ────────────────────────────────────────────────────
-    m_fileNameLabel = new QLabel("（未加载）");
+    m_fileNameLabel = new QLabel(truncatedFnLabel("（未加载）"));
     m_fileNameLabel->setAlignment(Qt::AlignCenter);
     m_fileNameLabel->setStyleSheet(
         "color:#333; font-weight:bold; background:#f0f0f0;"
         "border:1px solid #ccc; border-radius:3px; padding:2px 4px;");
-    m_fileNameLabel->setWordWrap(true);
+    m_fileNameLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_fileNameLabel->setMinimumWidth(0);
     m_fileNameLabel->setToolTip("当前加载的 TIFF 文件名");
 
     // ── 文件路径区 ────────────────────────────────────────────────────────
@@ -120,7 +133,7 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
 
     {
         m_tiffEdit = new QLineEdit;
-        m_tiffEdit->setPlaceholderText("选择或拖拽 TIFF 文件...");
+        m_tiffEdit->setPlaceholderText("选择或拖拽 TIFF 文件，或输入文件夹路径...");
         auto* row = new QHBoxLayout;
         row->setContentsMargins(0,0,0,0);
         row->addWidget(m_tiffEdit);
@@ -598,6 +611,7 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
 
     // ── 主布局（内容放入滚动区，窗口过小时可滚动，不遮挡控件）────────────
     auto* contentWidget = new QWidget;
+    contentWidget->setMaximumWidth(kDockFixedWidth);   // 防止长文件名撑宽面板
     auto* mainLay = new QVBoxLayout(contentWidget);
     mainLay->setContentsMargins(6, 6, 6, 6);
     mainLay->setSpacing(6);
@@ -701,6 +715,18 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     connect(bmpFolderBtn,  &QPushButton::clicked, this, &TiffBmpPanel::onBrowseBmpFolder);
     connect(m_tiffEdit, &QLineEdit::textChanged,
             this, &TiffBmpPanel::onTiffPathChanged);
+    // 输入文件夹路径后按回车或失去焦点：自动扫描并加载第一张
+    connect(m_tiffEdit, &QLineEdit::editingFinished, this, [this]{
+        const QString path = m_tiffEdit->text().trimmed();
+        if (path.isEmpty() || !QFileInfo(path).isDir()) return;
+        scanFolder(path, true);
+        if (m_folderFiles.isEmpty()) {
+            m_statusLabel->setText(ls("该文件夹中没有 TIFF 文件", "No TIFF files in folder"));
+            m_statusLabel->setStyleSheet("color:red;");
+            return;
+        }
+        activateFileAtIndex(0);
+    });
     connect(m_bmpEdit, &QLineEdit::textChanged, this, [this](const QString&) {
         if (currentModeNeedsBmp())
             triggerAutoReload();
@@ -925,9 +951,12 @@ void TiffBmpPanel::onBrowseTiff()
 
 void TiffBmpPanel::onBrowseBmp()
 {
+    const QString bmpDir = QFileInfo::exists(m_bmpEdit->text())
+        ? QFileInfo(m_bmpEdit->text()).absolutePath()
+        : QFileInfo(m_tiffEdit->text()).absolutePath();
     const QString path = QFileDialog::getOpenFileName(
         this, "选择亮度图（可选）",
-        QFileInfo(m_bmpEdit->text()).absolutePath(),
+        bmpDir,
         "Image Files (*.bmp *.BMP *.png *.jpg *.jpeg *.tif *.tiff *.TIF *.TIFF)");
     if (!path.isEmpty()) {
         m_bmpEdit->setText(path);
@@ -1429,7 +1458,9 @@ void TiffBmpPanel::scanFolder(const QString& tiffPath, bool forceRefresh)
     const QFileInfo fi(tiffPath);
     if (!fi.exists()) return;
 
-    const QString folderPath = fi.absolutePath();
+    // tiffPath 可以是 TIFF 文件路径，也可以是文件夹路径
+    const bool isDir = fi.isDir();
+    const QString folderPath = isDir ? fi.absoluteFilePath() : fi.absolutePath();
     const int sortOrder = m_sortOrderCb->currentIndex();
 
     if (!forceRefresh
@@ -1437,7 +1468,8 @@ void TiffBmpPanel::scanFolder(const QString& tiffPath, bool forceRefresh)
         && sortOrder == m_lastScanSortOrder
         && !m_folderFiles.isEmpty())
     {
-        m_currentIdx = m_folderFiles.indexOf(fi.absoluteFilePath());
+        if (!isDir)
+            m_currentIdx = m_folderFiles.indexOf(fi.absoluteFilePath());
         updateNavUI();
         return;
     }
@@ -1447,7 +1479,7 @@ void TiffBmpPanel::scanFolder(const QString& tiffPath, bool forceRefresh)
         m_bmpMatchCache.clear();
     }
 
-    const QDir dir = fi.absoluteDir();
+    const QDir dir = isDir ? QDir(fi.absoluteFilePath()) : fi.absoluteDir();
 
     QDir::SortFlags sf;
     switch (sortOrder) {
@@ -1801,10 +1833,10 @@ void TiffBmpPanel::loadFile(const QString& tiffPath)
     }
 
     // ── 位深检测：在后台加载前先轻量预解析并缓存 IFD 元数据 ───────────────
+    TiffBmpLoader::TiffInfo preparedInfo;
     {
-        TiffBmpLoader::TiffInfo info;
         int detectedDepth = 0;
-        prepareTiffInfo(tiffPath, info, &detectedDepth);
+        prepareTiffInfo(tiffPath, preparedInfo, &detectedDepth);
 
         auto defaultInvalidForDepth = [](int depth) -> double {
             if (depth >= 32) return -100.0;    // 32-bit float / 128-bit
@@ -1818,6 +1850,25 @@ void TiffBmpPanel::loadFile(const QString& tiffPath)
         }
         if (detectedDepth > 0)
             m_lastBitDepth = detectedDepth;
+    }
+
+    // ── 亮度图尺寸校验 ─────────────────────────────────────────────────────
+    if (currentModeNeedsBmp() && preparedInfo.valid) {
+        const QString bmpPath = m_bmpEdit->text().trimmed();
+        if (!bmpPath.isEmpty() && QFileInfo::exists(bmpPath)) {
+            QImageReader bmpReader(bmpPath);
+            const QSize bmpSize = bmpReader.size();
+            if (bmpSize.isValid() &&
+                (bmpSize.width() != preparedInfo.width || bmpSize.height() != preparedInfo.height)) {
+                m_statusLabel->setText(
+                    QString(ls("⚠ 亮度图尺寸 %1×%2 与 TIFF %3×%4 不匹配，请更换亮度图",
+                               "⚠ BMP %1×%2 ≠ TIFF %3×%4 — please select a matching BMP"))
+                        .arg(bmpSize.width()).arg(bmpSize.height())
+                        .arg(preparedInfo.width).arg(preparedInfo.height));
+                m_statusLabel->setStyleSheet("color:#cc6600;");
+                return;
+            }
+        }
     }
 
     ++m_requestedGeneration;
@@ -2142,10 +2193,10 @@ void TiffBmpPanel::applyLoadResult(const AsyncLoadResult& result)
         shouldReset = (dx*dx + dy*dy > threshold * threshold);
     }
 
-    // 加入新对象（不 zoom、不 redraw）
+    // 加入新对象（不 zoom、不自动选中、不 redraw）
     m_app->addToDB(object,
         /*updateZoom=*/false,
-        /*autoExpandDBTree=*/true,
+        /*autoExpandDBTree=*/false,
         /*checkDimensions=*/false,
         /*autoRedraw=*/false);
 
@@ -2188,7 +2239,9 @@ void TiffBmpPanel::applyLoadResult(const AsyncLoadResult& result)
     m_app->refreshAll();
     m_app->updateUI();
 
-    m_fileNameLabel->setText(QFileInfo(result.tiffPath).fileName());
+    const QString fn = QFileInfo(result.tiffPath).fileName();
+    m_fileNameLabel->setText(truncatedFnLabel(fn));
+    m_fileNameLabel->setToolTip(fn);
 
     const auto displayModeLabel = [this](DisplayMode mode) -> QString {
         switch (mode) {
@@ -2344,10 +2397,10 @@ void TiffBmpPanel::retranslateUi()
         m_statusLabel->setText(ls("就绪 — 支持拖拽 TIFF 文件", "Ready — drag & drop TIFF files"));
 
     // 文件名标签：仅在显示默认"未加载"文字时同步翻译
-    const QString notLoadedZh = QString::fromUtf8("（未加载）");
-    const QString notLoadedEn = QString::fromUtf8("(not loaded)");
+    const QString notLoadedZh = truncatedFnLabel("（未加载）");
+    const QString notLoadedEn = truncatedFnLabel("(not loaded)");
     if (m_fileNameLabel->text() == notLoadedZh || m_fileNameLabel->text() == notLoadedEn)
-        m_fileNameLabel->setText(ls("（未加载）", "(not loaded)"));
+        m_fileNameLabel->setText(truncatedFnLabel(ls("（未加载）", "(not loaded)")));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
