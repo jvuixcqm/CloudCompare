@@ -1,3 +1,5 @@
+// Copyright (c) 2026 LMI Technologies Inc. All rights reserved.
+// Author: Jim Wang, LMI Technologies
 #pragma once
 
 #include <QHash>
@@ -11,6 +13,7 @@ class QFutureWatcher;
 
 class QLineEdit;
 class QDoubleSpinBox;
+class QGroupBox;
 class QSpinBox;
 class QComboBox;
 class QCheckBox;
@@ -26,7 +29,7 @@ class TiffBmpPanel : public QWidget
     Q_OBJECT
 
 public:
-    static constexpr const char* kVersion     = "1.7";
+    static constexpr const char* kVersion     = "1.8";
     static constexpr int kPanelFixedWidth = 392;
     static constexpr int kDockFixedWidth  = 408;
 
@@ -95,6 +98,8 @@ private:
     bool prepareTiffInfo(const QString& tiffPath,
                          TiffBmpLoader::TiffInfo& outInfo,
                          int* outBitDepth = nullptr);
+    void retranslateUi();                              //!< 按 m_langEn 更新所有控件文字
+    QString ls(const char* zh, const char* en) const; //!< 返回当前语言字符串
 
 public:
     void saveViewportNow();     //!< 立即将当前视角写入配置文件（关窗时调用）
@@ -177,6 +182,37 @@ private:
     // ── QC 模式：判定输出路径控件（仅 qcMode 时创建）──
     QLineEdit*      m_okFolderEdit   = nullptr;
     QLineEdit*      m_ngFolderEdit   = nullptr;
+
+    // ── 语言切换 ──
+    bool            m_langEn         = false;
+    QPushButton*    m_langBtnZh      = nullptr;
+    QPushButton*    m_langBtnEn      = nullptr;
+
+    // ── 各区 GroupBox（供 retranslateUi 更新标题）──
+    QGroupBox*      m_fileGrp        = nullptr;
+    QGroupBox*      m_resGrp         = nullptr;
+    QGroupBox*      m_colorGrp       = nullptr;
+    QGroupBox*      m_modeGrp        = nullptr;
+    QGroupBox*      m_noiseGrp       = nullptr;
+    QGroupBox*      m_navGrp         = nullptr;
+    QGroupBox*      m_qcGrp          = nullptr;
+
+    // ── 翻译用标签（供 retranslateUi 更新文字）──
+    QLabel*         m_lblBmpRow      = nullptr;
+    QLabel*         m_lblBmpFolderRow= nullptr;
+    QLabel*         m_lblResHdr      = nullptr;
+    QLabel*         m_lblZInvalidRow = nullptr;
+    QLabel*         m_lblColorMinRow = nullptr;
+    QLabel*         m_lblColorMaxRow = nullptr;
+    QLabel*         m_lblAlphaText   = nullptr;
+    QLabel*         m_lblMaxEdgeText = nullptr;
+    QLabel*         m_lblNoiseMinPx  = nullptr;
+    QLabel*         m_lblNoiseZGap   = nullptr;
+    QLabel*         m_lblSortText    = nullptr;
+    QLabel*         m_lblYDsText     = nullptr;
+    QLabel*         m_lblLangText    = nullptr;
+    QLabel*         m_lblOkFolderRow = nullptr;
+    QLabel*         m_lblNgFolderRow = nullptr;
 
     // ── 自动重载防抖 ──
     QTimer*         m_autoReloadTimer = nullptr;

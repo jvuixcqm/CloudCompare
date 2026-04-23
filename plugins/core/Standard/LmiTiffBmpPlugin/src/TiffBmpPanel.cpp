@@ -1,3 +1,5 @@
+// Copyright (c) 2026 LMI Technologies Inc. All rights reserved.
+// Author: Jim Wang, LMI Technologies
 #include "TiffBmpPanel.h"
 #include "TiffBmpLoader.h"
 #include "FlexibleDoubleSpinBox.h"
@@ -107,7 +109,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     m_fileNameLabel->setToolTip("当前加载的 TIFF 文件名");
 
     // ── 文件路径区 ────────────────────────────────────────────────────────
-    auto* fileBox = new QGroupBox("文件路径");
+    m_fileGrp = new QGroupBox("文件路径");
+    auto* fileBox = m_fileGrp;
     auto* fileLay = new QFormLayout(fileBox);
     fileLay->setSpacing(4);
 
@@ -135,7 +138,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         bmpBrowseBtn = new QPushButton("...");
         bmpBrowseBtn->setFixedWidth(28);
         row->addWidget(bmpBrowseBtn);
-        fileLay->addRow("亮度图:", row);
+        m_lblBmpRow = new QLabel("亮度图:");
+        fileLay->addRow(m_lblBmpRow, row);
     }
     {
         m_bmpFolderEdit = new QLineEdit;
@@ -149,7 +153,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         bmpFolderBtn = new QPushButton("...");
         bmpFolderBtn->setFixedWidth(28);
         row->addWidget(bmpFolderBtn);
-        fileLay->addRow("亮度图文件夹:", row);
+        m_lblBmpFolderRow = new QLabel("亮度图文件夹:");
+        fileLay->addRow(m_lblBmpFolderRow, row);
     }
     if (!m_qcMode) {
         m_keepObjectChk = new QCheckBox("保留为独立对象（勾选后需手动点击加载）");
@@ -161,7 +166,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     }
 
     // ── 分辨率参数区 ──────────────────────────────────────────────────────
-    auto* resBox = new QGroupBox("物理分辨率");
+    m_resGrp = new QGroupBox("物理分辨率");
+    auto* resBox = m_resGrp;
     auto* resLay = new QFormLayout(resBox);
     resLay->setSpacing(4);
 
@@ -227,7 +233,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         grid->setContentsMargins(0, 0, 0, 0);
         grid->setSpacing(4);
         // 表头
-        auto* hdrRes = new QLabel("分辨率");
+        m_lblResHdr = new QLabel("分辨率");
+        auto* hdrRes = m_lblResHdr;
         hdrRes->setAlignment(Qt::AlignCenter);
         QFont hdrFont = hdrRes->font();
         hdrFont.setPointSize(hdrFont.pointSize() - 1);
@@ -273,7 +280,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         "原始像素值 ≤ 此值的点视为无效并跳过\n"
         "16-bit：整数（0~65535），默认 0（即跳过值为 0 的像素）\n"
         "32-bit float：NaN 像素自动跳过；浮点值 ≤ 此值的点同样跳过");
-    resLay->addRow("Z 无效值:", m_zInvalidSpin);
+    m_lblZInvalidRow = new QLabel("Z 无效值:");
+    resLay->addRow(m_lblZInvalidRow, m_zInvalidSpin);
 
     // 分辨率警告标签（初始隐藏）
     m_resWarningLabel = new QLabel();
@@ -283,7 +291,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     resLay->addRow(m_resWarningLabel);
 
     // ── 颜色渲染范围区 ────────────────────────────────────────────────────
-    auto* colorBox = new QGroupBox("颜色渲染范围");
+    m_colorGrp = new QGroupBox("颜色渲染范围");
+    auto* colorBox = m_colorGrp;
     auto* colorLay = new QFormLayout(colorBox);
     colorLay->setSpacing(4);
 
@@ -301,7 +310,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     cMinRow->setContentsMargins(0,0,0,0);
     cMinRow->addWidget(m_colorMinSlider);
     cMinRow->addWidget(m_colorMinLabel);
-    colorLay->addRow("下限:", cMinRow);
+    m_lblColorMinRow = new QLabel("下限:");
+    colorLay->addRow(m_lblColorMinRow, cMinRow);
 
     m_colorMaxSlider = makeColorSlider(100);
     m_colorMaxLabel  = new QLabel("100 %");
@@ -310,10 +320,12 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     cMaxRow->setContentsMargins(0,0,0,0);
     cMaxRow->addWidget(m_colorMaxSlider);
     cMaxRow->addWidget(m_colorMaxLabel);
-    colorLay->addRow("上限:", cMaxRow);
+    m_lblColorMaxRow = new QLabel("上限:");
+    colorLay->addRow(m_lblColorMaxRow, cMaxRow);
 
     // ── 显示模式区 ────────────────────────────────────────────────────────
-    auto* modeBox = new QGroupBox("显示模式");
+    m_modeGrp = new QGroupBox("显示模式");
+    auto* modeBox = m_modeGrp;
     auto* modeLay = new QVBoxLayout(modeBox);
     modeLay->setSpacing(4);
 
@@ -352,7 +364,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     m_fusionRow = new QWidget;
     auto* fusionLay = new QHBoxLayout(m_fusionRow);
     fusionLay->setContentsMargins(0, 2, 0, 0);
-    fusionLay->addWidget(new QLabel("融合系数 α:"));
+    m_lblAlphaText = new QLabel("融合系数 α:");
+    fusionLay->addWidget(m_lblAlphaText);
     m_alphaSlider = new QSlider(Qt::Horizontal);
     m_alphaSlider->setRange(0, 100);
     m_alphaSlider->setValue(50);
@@ -389,7 +402,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         auto* meshRow = new QHBoxLayout;
         meshRow->setContentsMargins(20, 0, 0, 0);
         meshRow->setSpacing(4);
-        meshRow->addWidget(new QLabel("最大边长:"));
+        m_lblMaxEdgeText = new QLabel("最大边长:");
+        meshRow->addWidget(m_lblMaxEdgeText);
         meshRow->addWidget(m_maxEdgeSpin);
         meshRow->addStretch();
         meshOptionsLay->addLayout(meshRow);
@@ -431,13 +445,15 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         rotDsRow->addWidget(m_rotateZ90Chk);
         rotDsRow->addWidget(m_rotateZ180Chk);
         rotDsRow->addStretch();
-        rotDsRow->addWidget(new QLabel("Y降采:"));
+        m_lblYDsText = new QLabel("Y降采:");
+        rotDsRow->addWidget(m_lblYDsText);
         rotDsRow->addWidget(m_yDsSampleCb);
         modeLay->addLayout(rotDsRow);
     }
 
     // ── 噪声过滤区 ────────────────────────────────────────────────────────
-    auto* noiseBox = new QGroupBox("噪声过滤");
+    m_noiseGrp = new QGroupBox("噪声过滤");
+    auto* noiseBox = m_noiseGrp;
     auto* noiseLay = new QVBoxLayout(noiseBox);
     noiseLay->setSpacing(4);
 
@@ -475,7 +491,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     noiseRow1->setContentsMargins(0, 0, 0, 0);
     noiseRow1->setSpacing(4);
     noiseRow1->addWidget(m_removeIslandsChk);
-    noiseRow1->addWidget(new QLabel("最小点数:"));
+    m_lblNoiseMinPx = new QLabel("最小点数:");
+    noiseRow1->addWidget(m_lblNoiseMinPx);
     noiseRow1->addWidget(m_minIslandSpin);
     noiseRow1->addStretch();
     noiseLay->addLayout(noiseRow1);
@@ -483,13 +500,15 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     auto* noiseRow2 = new QHBoxLayout;
     noiseRow2->setContentsMargins(0, 0, 0, 0);
     noiseRow2->setSpacing(4);
-    noiseRow2->addWidget(new QLabel("最大Z跳变:"));
+    m_lblNoiseZGap = new QLabel("最大Z跳变:");
+    noiseRow2->addWidget(m_lblNoiseZGap);
     noiseRow2->addWidget(m_maxZGapSpin);
     noiseRow2->addStretch();
     noiseLay->addLayout(noiseRow2);
 
     // ── 图像导航区 ────────────────────────────────────────────────────────
-    auto* navBox = new QGroupBox("图像导航（文件夹）");
+    m_navGrp = new QGroupBox("图像导航（文件夹）");
+    auto* navBox = m_navGrp;
     navBox->setToolTip(
         "快捷键（CC 主窗口在前台时生效）：\n"
         "  ◀ / ▶   Left / Right  — 上一张 / 下一张\n"
@@ -502,7 +521,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
     // 排序方式
     auto* sortRow = new QHBoxLayout;
     sortRow->setContentsMargins(0, 0, 0, 0);
-    sortRow->addWidget(new QLabel("排序方式:"));
+    m_lblSortText = new QLabel("排序方式:");
+    sortRow->addWidget(m_lblSortText);
     m_sortOrderCb = new NoWheelComboBox;
     m_sortOrderCb->addItem("按文件名");
     m_sortOrderCb->addItem("按修改时间（旧→新）");
@@ -591,7 +611,8 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
 
     // ── QC 模式：判定输出路径分组 ─────────────────────────────────────────
     if (m_qcMode) {
-        auto* qcBox    = new QGroupBox("判定输出路径");
+        m_qcGrp = new QGroupBox("判定输出路径");
+        auto* qcBox    = m_qcGrp;
         auto* qcLay    = new QFormLayout(qcBox);
         qcLay->setSpacing(4);
 
@@ -620,15 +641,48 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
             return row;
         };
 
-        qcLay->addRow("OK 文件夹:", makePathRow(m_okFolderEdit,
+        m_lblOkFolderRow = new QLabel("OK 文件夹:");
+        m_lblNgFolderRow = new QLabel("NG 文件夹:");
+        qcLay->addRow(m_lblOkFolderRow, makePathRow(m_okFolderEdit,
             "判定为 OK 时，自动将 TIFF 和亮度图复制到此文件夹"));
-        qcLay->addRow("NG 文件夹:", makePathRow(m_ngFolderEdit,
+        qcLay->addRow(m_lblNgFolderRow, makePathRow(m_ngFolderEdit,
             "判定为 NG 时，自动将 TIFF 和亮度图复制到此文件夹"));
         mainLay->addWidget(qcBox);
     }
 
     mainLay->addLayout(btnRow);
     mainLay->addWidget(m_statusLabel);
+
+    // ── 语言切换行 ──────────────────────────────────────────────────────
+    {
+        auto* langRow = new QHBoxLayout;
+        langRow->setContentsMargins(0, 0, 0, 0);
+        m_lblLangText = new QLabel("界面语言:");
+        m_langBtnZh = new QPushButton("中文");
+        m_langBtnEn = new QPushButton("English");
+        m_langBtnZh->setCheckable(true);
+        m_langBtnEn->setCheckable(true);
+        m_langBtnZh->setFixedHeight(22);
+        m_langBtnEn->setFixedHeight(22);
+        langRow->addStretch();
+        langRow->addWidget(m_lblLangText);
+        langRow->addSpacing(4);
+        langRow->addWidget(m_langBtnZh);
+        langRow->addWidget(m_langBtnEn);
+        mainLay->addLayout(langRow);
+
+        connect(m_langBtnZh, &QPushButton::clicked, this, [this] {
+            m_langEn = false;
+            saveSettings();
+            retranslateUi();
+        });
+        connect(m_langBtnEn, &QPushButton::clicked, this, [this] {
+            m_langEn = true;
+            saveSettings();
+            retranslateUi();
+        });
+    }
+
     mainLay->addStretch();
 
     auto* scrollArea = new QScrollArea(this);
@@ -761,7 +815,7 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         if (!m_app) return;
         ccHObject* root = m_app->dbRootObject();
         if (!root || root->getChildrenNumber() == 0) {
-            m_statusLabel->setText("场景已空，无需清理");
+            m_statusLabel->setText(ls("场景已空，无需清理", "Scene already empty"));
             m_statusLabel->setStyleSheet("color:#555; font-style:normal;");
             return;
         }
@@ -775,7 +829,9 @@ TiffBmpPanel::TiffBmpPanel(ccMainAppInterface* app, QWidget* parent, bool qcMode
         m_lastUID = 0;
         m_app->refreshAll();
         m_app->updateUI();
-        m_statusLabel->setText(QString("已清空场景（移除 %1 个对象）").arg(count));
+        m_statusLabel->setText(
+            QString(ls("已清空场景（移除 %1 个对象）", "Scene cleared (%1 objects removed)"))
+                .arg(count));
         m_statusLabel->setStyleSheet("color:#0055cc; font-style:normal;");
     });
     connect(m_firstBtn, &QPushButton::clicked, this, &TiffBmpPanel::onFirst);
@@ -1003,7 +1059,8 @@ void TiffBmpPanel::onLoad()
 {
     const QString tiff = m_tiffEdit->text().trimmed();
     if (tiff.isEmpty() || !QFileInfo::exists(tiff)) {
-        m_statusLabel->setText("❌ 请先选择有效的 TIFF 文件");
+        m_statusLabel->setText(ls("❌ 请先选择有效的 TIFF 文件",
+                                  "❌ Please select a valid TIFF file"));
         m_statusLabel->setStyleSheet("color:red;");
         return;
     }
@@ -1032,7 +1089,8 @@ void TiffBmpPanel::onPrev()
         activateFileAtIndex(target);
     } else {
         m_statusLabel->setText(
-            QString("已是第一张（共 %1 个文件）").arg(m_folderFiles.size()));
+            QString(ls("已是第一张（共 %1 个文件）", "Already at first (%1 files)"))
+                .arg(m_folderFiles.size()));
         m_statusLabel->setStyleSheet("color:#0055cc;");
     }
 }
@@ -1049,7 +1107,8 @@ void TiffBmpPanel::onNext()
         activateFileAtIndex(target);
     } else {
         m_statusLabel->setText(
-            QString("已是最后一张（共 %1 个文件）").arg(m_folderFiles.size()));
+            QString(ls("已是最后一张（共 %1 个文件）", "Already at last (%1 files)"))
+                .arg(m_folderFiles.size()));
         m_statusLabel->setStyleSheet("color:#0055cc;");
     }
 }
@@ -1103,7 +1162,8 @@ void TiffBmpPanel::activateFileAtIndex(int index)
     // 保留模式下只切换路径，不自动加载（需手动点击加载按钮）
     if (m_keepObjectChk && m_keepObjectChk->isChecked()) {
         m_statusLabel->setText(
-            QString("已切换: %1（保留模式，请手动点击加载）")
+            QString(ls("已切换: %1（保留模式，请手动点击加载）",
+                       "Switched: %1 (keep mode — click Load manually)"))
                 .arg(QFileInfo(tiff).fileName()));
         m_statusLabel->setStyleSheet("color:#555;");
         scheduleSettingsSave();
@@ -1124,7 +1184,8 @@ void TiffBmpPanel::tryParseResolutionFromFilename(const QString& path)
     };
 
     if (parts.size() < 3) {
-        warn("⚠ 文件名不含分辨率信息（需末尾有 3 段下划线分隔的数值）");
+        warn(ls("⚠ 文件名不含分辨率信息（需末尾有 3 段下划线分隔的数值）",
+                "⚠ No resolution in filename (need 3 underscore-separated values at end)"));
         return;
     }
     bool ok1, ok2, ok3;
@@ -1133,20 +1194,22 @@ void TiffBmpPanel::tryParseResolutionFromFilename(const QString& path)
     const double rz = parts[parts.size()-1].toDouble(&ok3);
 
     if (!ok1 || !ok2 || !ok3) {
-        warn("⚠ 文件名末尾 3 段无法解析为数值，请手动设置分辨率");
+        warn(ls("⚠ 文件名末尾 3 段无法解析为数值，请手动设置分辨率",
+                "⚠ Last 3 segments cannot be parsed as numbers, set manually"));
         return;
     }
-    // X/Y/Z 任一 > 1 mm 视为文件名含无关数字段导致的异常读取，丢弃并在底部提示
     if (rx > 1.0 || ry > 1.0 || rz > 1.0) {
         m_resWarningLabel->setVisible(false);
         m_statusLabel->setText(
-            QString("⚠ 自动分辨率异常（X=%1 Y=%2 Z=%3 mm，含大于 1 的值），已忽略，请手动设置")
+            QString(ls("⚠ 自动分辨率异常（X=%1 Y=%2 Z=%3 mm，含大于 1 的值），已忽略，请手动设置",
+                       "⚠ Auto-res abnormal (X=%1 Y=%2 Z=%3 mm, value >1), ignored — set manually"))
                 .arg(rx, 0, 'g', 4).arg(ry, 0, 'g', 4).arg(rz, 0, 'g', 4));
         m_statusLabel->setStyleSheet("color:#cc6600;");
         return;
     }
     if (rx <= 0 || ry <= 0 || rz <= 0) {
-        warn(QString("⚠ 解析到的分辨率含零或负值（X=%1 Y=%2 Z=%3），请手动设置")
+        warn(QString(ls("⚠ 解析到的分辨率含零或负值（X=%1 Y=%2 Z=%3），请手动设置",
+                        "⚠ Parsed resolution has zero/negative value (X=%1 Y=%2 Z=%3), set manually"))
              .arg(rx, 0, 'g', 4).arg(ry, 0, 'g', 4).arg(rz, 0, 'g', 4));
         return;
     }
@@ -1156,7 +1219,8 @@ void TiffBmpPanel::tryParseResolutionFromFilename(const QString& path)
     m_resZSpin->setValue(rz);
     m_resWarningLabel->setVisible(false);
     m_statusLabel->setText(
-        QString("自动分辨率: X=%1 Y=%2 Z=%3").arg(rx).arg(ry).arg(rz));
+        QString(ls("自动分辨率: X=%1 Y=%2 Z=%3", "Auto-res: X=%1 Y=%2 Z=%3"))
+            .arg(rx).arg(ry).arg(rz));
     m_statusLabel->setStyleSheet("color:#0055cc;");
 }
 
@@ -2007,7 +2071,7 @@ void TiffBmpPanel::applyLoadResult(const AsyncLoadResult& result)
 
     if (!result.object) {
         m_statusLabel->setText("❌ " + (result.error.isEmpty()
-            ? "加载失败（未知错误）" : result.error));
+            ? ls("加载失败（未知错误）", "Load failed (unknown error)") : result.error));
         m_statusLabel->setStyleSheet("color:red;");
         return;
     }
@@ -2126,56 +2190,164 @@ void TiffBmpPanel::applyLoadResult(const AsyncLoadResult& result)
 
     m_fileNameLabel->setText(QFileInfo(result.tiffPath).fileName());
 
-    const auto displayModeLabel = [](DisplayMode mode) -> QString {
+    const auto displayModeLabel = [this](DisplayMode mode) -> QString {
         switch (mode) {
-        case DisplayMode::Brightness: return QStringLiteral("亮度");
-        case DisplayMode::Fusion:     return QStringLiteral("融合");
-        case DisplayMode::HeightGray: return QStringLiteral("高度灰阶");
+        case DisplayMode::Brightness: return ls("亮度", "Brightness");
+        case DisplayMode::Fusion:     return ls("融合", "Fusion");
+        case DisplayMode::HeightGray: return ls("高度灰阶", "HeightGray");
         case DisplayMode::Height:
-        default:                      return QStringLiteral("高度");
+        default:                      return ls("高度", "Height");
         }
     };
 
-    const QString bitInfo   = (result.bitDepth == 128) ? " [128bit双通道]"
-                            : (result.bitDepth == 32)  ? " [32bit]"
-                            : (result.bitDepth == 17)  ? " [16bit有符号]"
-                            :                            " [16bit]";
+    const QString bitInfo   = (result.bitDepth == 128) ? ls(" [128bit双通道]", " [128-bit 2-ch]")
+                            : (result.bitDepth == 32)  ? QStringLiteral(" [32bit]")
+                            : (result.bitDepth == 17)  ? ls(" [16bit有符号]", " [16-bit signed]")
+                            :                            QStringLiteral(" [16bit]");
     QString brightnessInfo;
     if (result.displayMode == DisplayMode::Brightness || result.displayMode == DisplayMode::Fusion) {
         if (result.embeddedBrightnessUsed) {
-            brightnessInfo = QStringLiteral("（内嵌亮度通道）");
+            brightnessInfo = ls("（内嵌亮度通道）", "(embedded brightness)");
         } else if (result.syntheticBmpUsed) {
-            brightnessInfo = QStringLiteral("（合成亮度）");
+            brightnessInfo = ls("（合成亮度）", "(synthetic brightness)");
         } else if (!result.bmpPath.isEmpty()) {
             const QString bmpName = QFileInfo(result.bmpPath).fileName();
             brightnessInfo = result.autoMatchedBmpUsed
-                ? QStringLiteral("（自动匹配亮度图：%1）").arg(bmpName)
-                : QStringLiteral("（亮度图：%1）").arg(bmpName);
+                ? QString(ls("（自动匹配亮度图：%1）", "(auto-matched BMP: %1)")).arg(bmpName)
+                : QString(ls("（亮度图：%1）", "(BMP: %1)")).arg(bmpName);
         }
     }
-    const QString islandInfo = result.removeIslandsUsed ? "（已过滤小岛）" : "";
+    const QString islandInfo  = result.removeIslandsUsed
+        ? ls("（已过滤小岛）", "(noise filtered)") : QString();
     const QString normalsInfo = (dynamic_cast<ccMesh*>(object) && result.computeNormalsUsed)
-        ? QStringLiteral("（平滑法线）")
-        : QString();
-    const QString modeInfo = QStringLiteral("（%1模式）").arg(displayModeLabel(result.displayMode));
+        ? ls("（平滑法线）", "(smooth normals)") : QString();
+    const QString modeInfo = QString(ls("（%1模式）", "(%1 mode)"))
+        .arg(displayModeLabel(result.displayMode));
 
     auto* mesh  = dynamic_cast<ccMesh*>(object);
     auto* cloud = dynamic_cast<ccPointCloud*>(object);
     if (mesh) {
         m_statusLabel->setText(
-            QString("✓ 网格 %L1 三角形%2%3%4%5%6")
+            QString(ls("✓ 网格 %L1 三角形%2%3%4%5%6", "✓ Mesh %L1 tris%2%3%4%5%6"))
                 .arg(mesh->size()).arg(bitInfo).arg(modeInfo).arg(brightnessInfo).arg(islandInfo)
                 .arg(normalsInfo));
     } else if (cloud) {
         m_statusLabel->setText(
-            QString("✓ 点云 %L1 个点%2%3%4%5")
+            QString(ls("✓ 点云 %L1 个点%2%3%4%5", "✓ Cloud %L1 pts%2%3%4%5"))
                 .arg(cloud->size()).arg(bitInfo).arg(modeInfo).arg(brightnessInfo).arg(islandInfo));
     } else {
-        m_statusLabel->setText("✓ 已加载" + bitInfo + modeInfo + brightnessInfo + islandInfo);
+        m_statusLabel->setText(ls("✓ 已加载", "✓ Loaded") + bitInfo + modeInfo
+                               + brightnessInfo + islandInfo);
     }
     m_statusLabel->setStyleSheet("color:green;");
 
     scheduleSettingsSave();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 语言切换
+// ─────────────────────────────────────────────────────────────────────────────
+
+QString TiffBmpPanel::ls(const char* zh, const char* en) const
+{
+    return m_langEn ? QString::fromUtf8(en) : QString::fromUtf8(zh);
+}
+
+void TiffBmpPanel::retranslateUi()
+{
+    if (!m_langBtnZh) return; // 构造尚未完成
+
+    m_langBtnZh->setChecked(!m_langEn);
+    m_langBtnEn->setChecked( m_langEn);
+    if (m_lblLangText) m_lblLangText->setText(ls("界面语言:", "Language:"));
+
+    // 文件路径区
+    if (m_fileGrp)         m_fileGrp->setTitle(ls("文件路径", "File Path"));
+    if (m_lblBmpRow)       m_lblBmpRow->setText(ls("亮度图:", "Brightness:"));
+    if (m_lblBmpFolderRow) m_lblBmpFolderRow->setText(ls("亮度图文件夹:", "Brightness Folder:"));
+    m_tiffEdit->setPlaceholderText(ls("选择或拖拽 TIFF 文件...", "Select or drag TIFF file..."));
+    m_bmpEdit->setPlaceholderText(ls("自动匹配 / 手动选择亮度图...", "Auto-match / select brightness..."));
+    m_bmpFolderEdit->setPlaceholderText(ls("亮度图所在文件夹（可选）...", "Brightness folder (optional)..."));
+    if (m_keepObjectChk)
+        m_keepObjectChk->setText(ls("保留为独立对象（勾选后需手动点击加载）",
+                                    "Keep as separate object (manual load)"));
+
+    // 分辨率区
+    if (m_resGrp)       m_resGrp->setTitle(ls("物理分辨率 (mm/pixel)", "Resolution (mm/pixel)"));
+    m_autoResChk->setText(ls("自动从文件名读取分辨率", "Auto-detect from filename"));
+    if (m_useOffsetChk) m_useOffsetChk->setText(ls("启用偏移", "Enable Offset"));
+    if (m_lblResHdr)    m_lblResHdr->setText(ls("分辨率", "Resolution"));
+    if (m_offHdrLabel)  m_offHdrLabel->setText(ls("偏移", "Offset"));
+    if (m_lblZInvalidRow) m_lblZInvalidRow->setText(ls("Z 无效值:", "Z Invalid:"));
+
+    // 颜色渲染范围区
+    if (m_colorGrp)       m_colorGrp->setTitle(ls("颜色渲染范围", "Color Range"));
+    if (m_lblColorMinRow) m_lblColorMinRow->setText(ls("下限:", "Min:"));
+    if (m_lblColorMaxRow) m_lblColorMaxRow->setText(ls("上限:", "Max:"));
+
+    // 显示模式区
+    if (m_modeGrp) m_modeGrp->setTitle(ls("显示模式", "Display Mode"));
+    m_modeBtns[0]->setText(ls("高度\n色彩",  "Height\nColor"));
+    m_modeBtns[1]->setText(ls("亮度\n灰度",  "Bright-\nness"));
+    m_modeBtns[2]->setText(ls("融合\n模式",  "Fu-\nsion"));
+    m_modeBtns[3]->setText(ls("高度\n灰阶",  "Height\nGray"));
+    if (m_lblAlphaText)   m_lblAlphaText->setText(ls("融合系数 α:", "Fusion Alpha:"));
+    m_meshChk->setText(ls("生成三角网格（有序网格直接 mesh 化）", "Generate mesh (ordered grid)"));
+    if (m_lblMaxEdgeText) m_lblMaxEdgeText->setText(ls("最大边长:", "Max Edge:"));
+    m_rotateZ90Chk->setText(ls("绕Z+旋转90°",  "Rotate Z+ 90°"));
+    m_rotateZ180Chk->setText(ls("绕Z+旋转180°", "Rotate Z+ 180°"));
+    if (m_lblYDsText) m_lblYDsText->setText(ls("Y降采:", "Y Sub:"));
+    {
+        const int cur = m_yDsSampleCb->currentIndex();
+        QSignalBlocker blk(m_yDsSampleCb);
+        m_yDsSampleCb->clear();
+        m_yDsSampleCb->addItem(ls("全采", "Full"));
+        m_yDsSampleCb->addItem("1/2");
+        m_yDsSampleCb->addItem("1/3");
+        m_yDsSampleCb->addItem("1/5");
+        m_yDsSampleCb->addItem("1/10");
+        m_yDsSampleCb->addItem("1/20");
+        m_yDsSampleCb->setCurrentIndex(cur);
+    }
+
+    // 噪声过滤区
+    if (m_noiseGrp)       m_noiseGrp->setTitle(ls("噪声过滤", "Noise Filter"));
+    m_removeIslandsChk->setText(ls("移除孤岛噪声", "Remove Island Noise"));
+    if (m_lblNoiseMinPx) m_lblNoiseMinPx->setText(ls("最小点数:", "Min Pixels:"));
+    if (m_lblNoiseZGap)  m_lblNoiseZGap->setText(ls("最大Z跳变:", "Max Z Gap:"));
+
+    // 图像导航区
+    if (m_navGrp)      m_navGrp->setTitle(ls("图像导航（文件夹）", "Image Navigation (Folder)"));
+    if (m_lblSortText) m_lblSortText->setText(ls("排序方式:", "Sort:"));
+    {
+        const int cur = m_sortOrderCb->currentIndex();
+        QSignalBlocker blk(m_sortOrderCb);
+        m_sortOrderCb->clear();
+        m_sortOrderCb->addItem(ls("按文件名", "By Name"));
+        m_sortOrderCb->addItem(ls("按修改时间（旧→新）", "By Date (Old\xe2\x86\x92New)"));
+        m_sortOrderCb->addItem(ls("按修改时间（新→旧）", "By Date (New\xe2\x86\x92Old)"));
+        m_sortOrderCb->setCurrentIndex(cur);
+    }
+
+    // 加载按钮
+    m_loadButton->setText(ls("加  载", "  Load  "));
+
+    // QC 模式
+    if (m_qcGrp)          m_qcGrp->setTitle(ls("判定输出路径", "QC Output Paths"));
+    if (m_lblOkFolderRow) m_lblOkFolderRow->setText(ls("OK 文件夹:", "OK Folder:"));
+    if (m_lblNgFolderRow) m_lblNgFolderRow->setText(ls("NG 文件夹:", "NG Folder:"));
+
+    // 状态标签：仅在显示默认就绪文字时同步翻译
+    const QString readyZh = QString::fromUtf8("就绪 — 支持拖拽 TIFF 文件");
+    const QString readyEn = QString::fromUtf8("Ready — drag & drop TIFF files");
+    if (m_statusLabel->text() == readyZh || m_statusLabel->text() == readyEn)
+        m_statusLabel->setText(ls("就绪 — 支持拖拽 TIFF 文件", "Ready — drag & drop TIFF files"));
+
+    // 文件名标签：仅在显示默认"未加载"文字时同步翻译
+    const QString notLoadedZh = QString::fromUtf8("（未加载）");
+    const QString notLoadedEn = QString::fromUtf8("(not loaded)");
+    if (m_fileNameLabel->text() == notLoadedZh || m_fileNameLabel->text() == notLoadedEn)
+        m_fileNameLabel->setText(ls("（未加载）", "(not loaded)"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2239,6 +2411,7 @@ void TiffBmpPanel::loadSettings()
     m_maxZGapSpin->setEnabled(m_removeIslandsChk->isChecked());
 
     m_sortOrderCb->setCurrentIndex(s.value("sortOrder", 0).toInt());
+    m_langEn = (s.value("UI/lang", "zh").toString() == "en");
 
     // 路径最后设置（会触发 onTiffPathChanged → scanFolder 等）
     const QString bmpFolder = s.value("bmpFolder", "").toString();
@@ -2252,6 +2425,8 @@ void TiffBmpPanel::loadSettings()
     const QString tiffPath = s.value("tiffPath", "").toString();
     if (!tiffPath.isEmpty() && QFileInfo::exists(tiffPath))
         m_tiffEdit->setText(tiffPath);
+
+    retranslateUi();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2370,6 +2545,7 @@ void TiffBmpPanel::saveSettings()
     s.setValue("minIslandDist",   m_minIslandDistSpin->value());
     s.setValue("maxZGap",         m_maxZGapSpin->value());
     s.setValue("sortOrder",       m_sortOrderCb->currentIndex());
+    s.setValue("UI/lang",         m_langEn ? "en" : "zh");
     s.setValue("panelDefaultsVersion", kPanelDefaultsVersion);
     s.remove("computeNormals");
     s.sync();
