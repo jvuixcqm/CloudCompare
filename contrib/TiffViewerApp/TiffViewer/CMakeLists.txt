@@ -104,27 +104,33 @@ endif()
 # 链接库
 # ──────────────────────────────────────────────────────────────────────────────
 if(APPLE)
-    # macOS 上 CloudCompare 的构建产物是 .dylib，且目录布局取决于生成器：
-    # Xcode（多配置）会有 Release/ 子目录，Ninja/Unix Makefiles（单配置）没有。
-    # 用 find_library 同时探测两种布局，避免在这里硬编码某一种。
-    function(cc_find_lib OUT_VAR LIB_NAME SEARCH_DIR)
-        find_library(${OUT_VAR} ${LIB_NAME}
-            PATHS "${SEARCH_DIR}" "${SEARCH_DIR}/Release" "${SEARCH_DIR}/RelWithDebInfo"
-            NO_DEFAULT_PATH)
-        if(NOT ${OUT_VAR})
-            message(FATAL_ERROR "找不到 ${LIB_NAME}（在 ${SEARCH_DIR} 及其 Release/RelWithDebInfo 子目录下）。"
+    # macOS 上 CloudCompare 的构建产物是 .dylib/.a，具体落在哪个子目录取决于生成器
+    # （Xcode 多配置会有 Release/ 子目录，Ninja/Unix Makefiles 单配置通常没有，
+    # 也可能被 CMAKE_*_OUTPUT_DIRECTORY 之类的设置重定向到别的公共目录）。
+    # 不猜目录布局，直接在整个 CC_BUILD 树下递归找 lib<name>.dylib / lib<name>.a。
+    function(cc_find_lib OUT_VAR LIB_NAME)
+        file(GLOB_RECURSE _cc_lib_candidates
+            "${CC_BUILD}/*/lib${LIB_NAME}.dylib"
+            "${CC_BUILD}/*/lib${LIB_NAME}.a"
+        )
+        list(LENGTH _cc_lib_candidates _cc_lib_count)
+        if(_cc_lib_count EQUAL 0)
+            message(FATAL_ERROR "找不到 ${LIB_NAME} 的编译产物（在 ${CC_BUILD} 下递归搜索 "
+                "lib${LIB_NAME}.dylib / lib${LIB_NAME}.a 均未命中）。"
                 "请确认 CC_BUILD 指向的 macOS 版 CloudCompare 已编译完成。")
         endif()
-        mark_as_advanced(${OUT_VAR})
+        list(GET _cc_lib_candidates 0 _cc_lib_found)
+        set(${OUT_VAR} "${_cc_lib_found}" PARENT_SCOPE)
+        message(STATUS "cc_find_lib: ${LIB_NAME} -> ${_cc_lib_found}")
     endfunction()
 
-    cc_find_lib(CC_LIB_APPCOMMON  CCAppCommon   "${CC_BUILD}/libs/CCAppCommon")
-    cc_find_lib(CC_LIB_PLUGINAPI  CCPluginAPI   "${CC_BUILD}/libs/CCPluginAPI")
-    cc_find_lib(CC_LIB_DB         QCC_DB_LIB    "${CC_BUILD}/libs/qCC_db")
-    cc_find_lib(CC_LIB_GL         QCC_GL_LIB    "${CC_BUILD}/libs/qCC_glWindow")
-    cc_find_lib(CC_LIB_FBO        CC_FBO_LIB    "${CC_BUILD}/libs/CCFbo")
-    cc_find_lib(CC_LIB_CORE       CCCoreLib     "${CC_BUILD}/libs/qCC_db/extern/CCCoreLib")
-    cc_find_lib(CC_LIB_PLUGINSTUB CCPluginStub  "${CC_BUILD}/libs/CCPluginStub")
+    cc_find_lib(CC_LIB_APPCOMMON  CCAppCommon)
+    cc_find_lib(CC_LIB_PLUGINAPI  CCPluginAPI)
+    cc_find_lib(CC_LIB_DB         QCC_DB_LIB)
+    cc_find_lib(CC_LIB_GL         QCC_GL_LIB)
+    cc_find_lib(CC_LIB_FBO        CC_FBO_LIB)
+    cc_find_lib(CC_LIB_CORE       CCCoreLib)
+    cc_find_lib(CC_LIB_PLUGINSTUB CCPluginStub)
 
     target_link_libraries(TiffViewer PRIVATE
         ${CC_LIB_APPCOMMON}
@@ -140,6 +146,14 @@ if(APPLE)
         Qt6::Concurrent
     )
 
+    # rpath 直接从实际找到的 .dylib 路径反推目录，而不是猜测布局
+    set(_cc_rpath_dirs "")
+    foreach(_lib IN ITEMS ${CC_LIB_APPCOMMON} ${CC_LIB_PLUGINAPI} ${CC_LIB_DB} ${CC_LIB_GL} ${CC_LIB_FBO} ${CC_LIB_CORE} ${CC_LIB_PLUGINSTUB})
+        get_filename_component(_lib_dir "${_lib}" DIRECTORY)
+        list(APPEND _cc_rpath_dirs "${_lib_dir}")
+    endforeach()
+    list(REMOVE_DUPLICATES _cc_rpath_dirs)
+
     set_target_properties(TiffViewer PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/mac/Info.plist.in"
@@ -150,7 +164,7 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2026 LMI Technologies Inc."
         BUILD_WITH_INSTALL_RPATH TRUE
-        INSTALL_RPATH "@executable_path/../Frameworks;${CC_BUILD}/libs/CCAppCommon;${CC_BUILD}/libs/CCAppCommon/Release;${CC_BUILD}/libs/CCPluginAPI;${CC_BUILD}/libs/CCPluginAPI/Release;${CC_BUILD}/libs/qCC_db;${CC_BUILD}/libs/qCC_db/Release;${CC_BUILD}/libs/qCC_glWindow;${CC_BUILD}/libs/qCC_glWindow/Release;${CC_BUILD}/libs/CCFbo;${CC_BUILD}/libs/CCFbo/Release;${CC_BUILD}/libs/qCC_db/extern/CCCoreLib;${CC_BUILD}/libs/qCC_db/extern/CCCoreLib/Release"
+        INSTALL_RPATH "@executable_path/../Frameworks;${_cc_rpath_dirs}"
     )
     # 上面把 CC_BUILD 里的绝对路径直接写进 rpath，只适合"本机开发调试直接运行"，
     # 不是可分发的安装包（换机器路径就失效）。要打出能拷到别的 Mac 上运行的 .app，
