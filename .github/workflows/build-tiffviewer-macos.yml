@@ -73,6 +73,9 @@ jobs:
       - name: Build plugin (+ transitive CC libs)
         run: cmake --build build_cc --target LMI_TIFFBMP_PLUGIN --parallel
 
+      - name: List built libraries (diagnostic)
+        run: find build_cc -name '*.dylib' -o -name '*.a' | sort
+
       - name: Configure TiffViewer
         run: |
           cmake -S contrib/TiffViewerApp/TiffViewer -B build_tv -G Ninja \

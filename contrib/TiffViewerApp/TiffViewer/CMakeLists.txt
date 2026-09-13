@@ -110,8 +110,8 @@ if(APPLE)
     # 不猜目录布局，直接在整个 CC_BUILD 树下递归找 lib<name>.dylib / lib<name>.a。
     function(cc_find_lib OUT_VAR LIB_NAME)
         file(GLOB_RECURSE _cc_lib_candidates
-            "${CC_BUILD}/*/lib${LIB_NAME}.dylib"
-            "${CC_BUILD}/*/lib${LIB_NAME}.a"
+            "${CC_BUILD}/lib${LIB_NAME}.dylib"
+            "${CC_BUILD}/lib${LIB_NAME}.a"
         )
         list(LENGTH _cc_lib_candidates _cc_lib_count)
         if(_cc_lib_count EQUAL 0)
