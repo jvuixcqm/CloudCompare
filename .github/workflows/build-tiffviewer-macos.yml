@@ -1,0 +1,110 @@
+name: Build TiffViewer (macOS)
+
+# 只编译 TiffViewer 独立版需要的那一小片 CloudCompare 库（CCAppCommon / CCPluginAPI /
+# QCC_DB_LIB / QCC_GL_LIB / CC_FBO_LIB / CCCoreLib / CCPluginStub），不编译完整的
+# qCC 主程序或 ccViewer —— 通过只 --target LMI_TIFFBMP_PLUGIN 来限定编译范围
+# （跟 build_cloudcompare.ps1 在 Windows 上用的是同一个 target，已知可行）。
+#
+# 这份 workflow 没有在真实 macOS 上跑过、验证过——本项目的开发环境是纯 Windows，
+# 没有 Mac 也没有其它 macOS CI 可用来预先跑一遍。如果失败，把 Actions 里的报错日志
+# 贴回来，照着报错改这个文件即可，不需要从头重新设计。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ feat/lmi-tiffbmp-plugin ]
+    paths:
+      - 'contrib/TiffViewerApp/**'
+      - 'plugins/core/Standard/LmiTiffBmpPlugin/**'
+      - 'libs/**'
+      - '.github/workflows/build-tiffviewer-macos.yml'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14   # Apple Silicon (arm64) —— 2020 年之后的 Mac
+            arch: arm64
+          - runner: macos-13   # Intel (x86_64) —— 2020 年之前的 Mac
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: 'mac'
+          target: 'desktop'
+          modules: 'qtsvg'
+          cache: true
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Generate app icon (.icns)
+        working-directory: contrib/TiffViewerApp/TiffViewer/mac
+        run: |
+          python3 generate_icon.py
+          iconutil -c icns TiffViewer.iconset -o TiffViewer.icns
+
+      - name: Configure CloudCompare core libs + plugin
+        run: |
+          cmake -S . -B build_cc -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQt6_DIR="$Qt6_DIR" \
+            -DOPTION_BUILD_CCVIEWER=OFF \
+            -DPLUGIN_STANDARD_LMI_TIFFBMP=ON \
+            -DPLUGIN_STANDARD_QCORK=OFF \
+            -DPLUGIN_STANDARD_QPCL=OFF \
+            -DPLUGIN_STANDARD_QCANUPO=OFF \
+            -DPLUGIN_STANDARD_Q3DMASC=OFF \
+            -DPLUGIN_STANDARD_QMASONRY=OFF \
+            -DPLUGIN_STANDARD_QMPLANE=OFF \
+            -DPLUGIN_STANDARD_QTREEISO=OFF \
+            -DPLUGIN_STANDARD_QVOXFALL=OFF
+
+      - name: Build plugin (+ transitive CC libs)
+        run: cmake --build build_cc --target LMI_TIFFBMP_PLUGIN --parallel
+
+      - name: Configure TiffViewer
+        run: |
+          cmake -S contrib/TiffViewerApp/TiffViewer -B build_tv -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQt6_DIR="$Qt6_DIR" \
+            -DCC_SRC="$GITHUB_WORKSPACE" \
+            -DCC_BUILD="$GITHUB_WORKSPACE/build_cc"
+
+      - name: Build TiffViewer
+        run: cmake --build build_tv --parallel
+
+      - name: Package .app + .dmg
+        run: |
+          set -eux
+          QT_BIN="$(cd "$Qt6_DIR/../../../bin" && pwd)"
+          APP="build_tv/TiffViewer.app"
+          test -d "$APP" || APP="build_tv/Release/TiffViewer.app"
+
+          # main.cpp 用 QDir::setCurrent(applicationDirPath()) 把当前目录设为可执行文件
+          # 所在目录；在 .app 里那是 Contents/MacOS/，shaders 要放在这一层
+          # （跟 Windows 版 shaders 文件夹放在 exe 旁边是同一个逻辑）。
+          SHADER_SRC="$GITHUB_WORKSPACE/qCC/shaders"
+          if [ -d "$SHADER_SRC" ]; then
+            mkdir -p "$APP/Contents/MacOS/shaders"
+            cp -R "$SHADER_SRC/." "$APP/Contents/MacOS/shaders/"
+          fi
+
+          "$QT_BIN/macdeployqt" "$APP" -dmg -verbose=2
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TiffViewer-macOS-${{ matrix.arch }}
+          path: build_tv/*.dmg
+          if-no-files-found: error

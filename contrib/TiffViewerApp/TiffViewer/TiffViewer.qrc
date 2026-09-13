@@ -1,0 +1,23 @@
+<RCC>
+    <qresource prefix="/tv">
+        <file>icons/ccViewZpos.png</file>
+        <file>icons/ccViewZneg.png</file>
+        <file>icons/ccViewYneg.png</file>
+        <file>icons/ccViewYpos.png</file>
+        <file>icons/ccViewXneg.png</file>
+        <file>icons/ccViewXpos.png</file>
+        <file>icons/ccViewIso1.png</file>
+        <file>icons/ccViewIso2.png</file>
+        <file>icons/ccGlobalZoom.png</file>
+        <file>icons/ccPointSize.png</file>
+        <file>icons/ccOrthoMode32.png</file>
+        <file>icons/ccCenteredPerspective32.png</file>
+        <file>icons/ccViewerBasedPerspective32.png</file>
+        <file>icons/ccPivotOn.png</file>
+        <file>icons/ccPivotAuto.png</file>
+        <file>icons/ccPivotOff.png</file>
+        <file>icons/ccPickCenter.png</file>
+        <file>icons/ccPickCenterAuto.png</file>
+        <file>icons/lockedAxis.png</file>
+    </qresource>
+</RCC>
