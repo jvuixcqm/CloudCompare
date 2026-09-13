@@ -42,7 +42,6 @@ jobs:
           version: '6.8.3'
           host: 'mac'
           target: 'desktop'
-          modules: 'qtsvg'
           cache: true
 
       - name: Install Ninja
