@@ -10,6 +10,7 @@
 class ccGLWindowInterface;
 class TiffBmpPanel;
 class QDockWidget;
+class QToolButton;
 
 //! 独立查看器主窗口，实现 ccMainAppInterface 供 TiffBmpPanel 使用
 class TiffViewerWindow : public QMainWindow, public ccMainAppInterface
