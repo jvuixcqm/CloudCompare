@@ -8,6 +8,9 @@ name: Build TiffViewer (macOS)
 # 这份 workflow 没有在真实 macOS 上跑过、验证过——本项目的开发环境是纯 Windows，
 # 没有 Mac 也没有其它 macOS CI 可用来预先跑一遍。如果失败，把 Actions 里的报错日志
 # 贴回来，照着报错改这个文件即可，不需要从头重新设计。
+#
+# 注：workflow_dispatch（手动触发按钮）只有当这个文件存在于默认分支时才可用，
+# 目前只在 feat/lmi-tiffbmp-plugin 上，触发方式仍然是 push。
 
 on:
   workflow_dispatch:
