@@ -71,7 +71,10 @@ jobs:
             -DPLUGIN_STANDARD_QVOXFALL=OFF
 
       - name: Build plugin (+ transitive CC libs)
-        run: cmake --build build_cc --target LMI_TIFFBMP_PLUGIN --parallel
+        # LmiTiffBmpPlugin 本身不链接 CCAppCommon（它只是被 TiffViewer 直接使用，
+        # 插件 DLL 用不到），--target LMI_TIFFBMP_PLUGIN 不会把它当依赖编译，
+        # 所以要显式加进来。
+        run: cmake --build build_cc --target LMI_TIFFBMP_PLUGIN CCAppCommon --parallel
 
       - name: List built libraries (diagnostic)
         run: find build_cc -name '*.dylib' -o -name '*.a' | sort
