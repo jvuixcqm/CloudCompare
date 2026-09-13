@@ -51,6 +51,7 @@ jobs:
       - name: Generate app icon (.icns)
         working-directory: contrib/TiffViewerApp/TiffViewer/mac
         run: |
+          python3 -m pip install --quiet pillow
           python3 generate_icon.py
           iconutil -c icns TiffViewer.iconset -o TiffViewer.icns
 
