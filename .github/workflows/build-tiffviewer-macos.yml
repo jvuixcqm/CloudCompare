@@ -58,7 +58,7 @@ jobs:
         run: |
           cmake -S . -B build_cc -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DQt6_DIR="$Qt6_DIR" \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DOPTION_BUILD_CCVIEWER=OFF \
             -DPLUGIN_STANDARD_LMI_TIFFBMP=ON \
             -DPLUGIN_STANDARD_QCORK=OFF \
@@ -83,7 +83,7 @@ jobs:
         run: |
           cmake -S contrib/TiffViewerApp/TiffViewer -B build_tv -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DQt6_DIR="$Qt6_DIR" \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DCC_SRC="$GITHUB_WORKSPACE" \
             -DCC_BUILD="$GITHUB_WORKSPACE/build_cc"
 
@@ -93,7 +93,7 @@ jobs:
       - name: Package .app + .dmg
         run: |
           set -eux
-          QT_BIN="$(cd "$Qt6_DIR/../../../bin" && pwd)"
+          QT_BIN="$QT_ROOT_DIR/bin"
           APP="build_tv/TiffViewer.app"
           test -d "$APP" || APP="build_tv/Release/TiffViewer.app"
 
