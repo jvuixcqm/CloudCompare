@@ -33,6 +33,12 @@ jobs:
           - runner: macos-13   # Intel (x86_64) —— 2020 年之前的 Mac
             arch: x86_64
     runs-on: ${{ matrix.runner }}
+    # 安全网：Package 步骤里的 macdeployqt -dmg 用 hdiutil 创建/挂载磁盘镜像，曾经因为
+    # Spotlight 在卸载前抢先索引新挂载的卷导致 hdiutil 卡住不退出，job 会一直停在收尾的
+    # "Complete job / Cleaning up orphan processes"，直到默认的 6 小时上限才结束。这里给
+    # 一个远高于正常耗时（arm64 全流程约 4 分钟）但足够短的硬上限，卡住时能较快失败并留下
+    # 日志，而不是无限期占用 Actions 额度。
+    timeout-minutes: 30
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v4
@@ -96,6 +102,12 @@ jobs:
       - name: Package .app + .dmg
         run: |
           set -eux
+          # 关掉 Spotlight 索引：macdeployqt -dmg 用 hdiutil 创建/挂载一个临时磁盘镜像
+          # 再卸载，如果 Spotlight 抢在卸载前开始索引这个新卷，hdiutil 会因为 "resource
+          # busy" 卡住不退出，进而让整个 job 卡在收尾清理阶段。见 job 上的 timeout-minutes
+          # 注释。sudo/mdutil 在某些 runner 镜像上可能不可用，失败不影响构建本身。
+          sudo mdutil -a -i off >/dev/null 2>&1 || true
+
           QT_BIN="$QT_ROOT_DIR/bin"
           APP="build_tv/TiffViewer.app"
           test -d "$APP" || APP="build_tv/Release/TiffViewer.app"
@@ -110,6 +122,13 @@ jobs:
           fi
 
           "$QT_BIN/macdeployqt" "$APP" -dmg -verbose=2
+
+      - name: Detach any stray mounted volumes (best-effort)
+        if: always()
+        run: |
+          for vol in /Volumes/TiffViewer*; do
+            [ -d "$vol" ] && hdiutil detach "$vol" -force || true
+          done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
