@@ -407,9 +407,11 @@ static std::vector<quint16> tryReadTiff16Lzw(const QString& path, const TiffInfo
     if (W <= 0 || H <= 0) return {};
 
     // 每像素 2 字节；strip 的未压缩字节数 = rowsPerStrip × W × 2
-    const int rowsPerStrip = (info.rowsPerStrip > 0) ? info.rowsPerStrip : H;
-    const int bpp          = 2;
-    const int rowBytes     = W * bpp;
+    // rowBytes/expectedBytes 用 qint64 计算，避免 W 异常大时 int 相乘溢出后
+    // 让下面的长度校验失效、进而按原始 W 做越界指针读写
+    const int    rowsPerStrip = (info.rowsPerStrip > 0) ? info.rowsPerStrip : H;
+    const int    bpp          = 2;
+    const qint64 rowBytes     = static_cast<qint64>(W) * bpp;
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) return {};
@@ -426,10 +428,14 @@ static std::vector<quint16> tryReadTiff16Lzw(const QString& path, const TiffInfo
         if (raw.isEmpty()) return {};
 
         // 本 strip 实际行数：除最后一个 strip 外都 == rowsPerStrip
-        const int rowsThisStrip = std::min(rowsPerStrip, H - rowCursor);
-        const int expectedBytes = rowsThisStrip * rowBytes;
+        const int    rowsThisStrip = std::min(rowsPerStrip, H - rowCursor);
+        const qint64 expectedBytes = static_cast<qint64>(rowsThisStrip) * rowBytes;
+        // decodeStrip 的 expectedSize 形参是 int（仅用作 reserve 提示），
+        // 超出 int 范围说明尺寸已经不正常，直接判失败而不是截断后继续
+        if (expectedBytes > std::numeric_limits<int>::max())
+            return {};
 
-        if (!LzwTiff::decodeStrip(raw, decoded, expectedBytes))
+        if (!LzwTiff::decodeStrip(raw, decoded, static_cast<int>(expectedBytes)))
             return {};
         if (decoded.size() < expectedBytes)
             return {};
@@ -439,7 +445,7 @@ static std::vector<quint16> tryReadTiff16Lzw(const QString& path, const TiffInfo
             // 解释字节为 16-bit 样本（TIFF 字节序）
             quint16* dst = out.data()
                 + static_cast<size_t>(rowCursor + r) * static_cast<size_t>(W);
-            const quint8* rowSrc = dp + r * rowBytes;
+            const quint8* rowSrc = dp + static_cast<qint64>(r) * rowBytes;
             if (le) {
                 for (int x = 0; x < W; ++x)
                     dst[x] = static_cast<quint16>(rowSrc[2*x] | (rowSrc[2*x+1] << 8));
@@ -459,6 +465,10 @@ static std::vector<quint16> tryReadTiff16Lzw(const QString& path, const TiffInfo
     if (rowCursor < H) return {}; // 数据不完整
     return out;
 }
+
+// 与 SRF/SUR/PLY/PCD 的 kSrfMaxPoints/kSurMaxPoints/kPlyPcdMaxPoints 上限一致：
+// 防止异常/损坏的 width×height 触发无上限内存分配（OOM）或下游按 int 计算行字节数时溢出
+constexpr quint64 kTiffMaxPixels = 200000000ULL;
 
 static bool buildTiffInfo(const QString& path, TiffInfo& outInfo)
 {
@@ -528,7 +538,9 @@ static bool buildTiffInfo(const QString& path, TiffInfo& outInfo)
                      : outInfo.is32Float ? 32
                      : outInfo.is16BitSigned ? 17
                      : 16;
-    outInfo.valid = (outInfo.width > 0 && outInfo.height > 0);
+    outInfo.valid = (outInfo.width > 0 && outInfo.height > 0
+        && static_cast<quint64>(outInfo.width) * static_cast<quint64>(outInfo.height)
+               <= kTiffMaxPixels);
 
     // ── 嵌入式 3D 标定元数据解析（按优先级覆盖）────────────────────────────
     // 优先级 3（最低，仅 X/Y）：标准 TIFF XResolution(282)/YResolution(283) + ResolutionUnit(296)
@@ -3441,7 +3453,7 @@ public:
     QByteArray encode(const quint8* src, qint64 size)
     {
         out.clear();
-        out.reserve(static_cast<int>(size + size / 8 + 64));
+        out.reserve(size + size / 8 + 64);
         bitsBuffer = 0; bitsInBuffer = 0;
         codeSize = 9; nextCode = kFirstFree;
         dict.clear();
@@ -3571,7 +3583,7 @@ static bool writeTiffLzwLE(const QString& path, int W, int H,
     const int bytesPerSample = bps / 8;
     const int rowBytes = W * bytesPerSample;
     QByteArray predicted;
-    predicted.resize(static_cast<int>(dataBytes));
+    predicted.resize(dataBytes);
     memcpy(predicted.data(), rawData, dataBytes);
 
     if (predictor == 2 && bps == 16) {
