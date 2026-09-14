@@ -3550,19 +3550,31 @@ bool TiffBmpPanel::exportSourceTo(const QString& srcPath, const QString& outDir,
         }
     } else {
         // 源是 int16（SRF / 16-bit TIFF）：直接走 raw_int16 路径，无损保留
+        //
+        // meta.offsetZ 来自 currentPanelMeta()/resolveExportMetaForFile()，语境是
+        // "像素直接使用"（与交互式加载路径默认公式 Z=pixel*scaleZ+offsetZ 一致）。
+        // 但源若是 16 位无符号 TIFF，readSourceForExport() 里的 src.rawInt16 是
+        // pixel-32768（居中表示，Z=rawInt16*scaleZ+offsetZ 语境），两者不匹配，
+        // 需要补偿 +32768*scaleZ 才能得到与交互式默认一致的物理 Z；
+        // legacy 兼容开关打开时（旧文件，zOffset 本就按居中语境写入）则不补偿。
+        // 见 [[project_z_offset_uint16_fix]]。
+        TiffBmpLoader::ExportTiffMeta effMeta = meta;
+        if (src.sourceIsUnsignedUint16 && !m_legacyUint16CompatEnabled)
+            effMeta.offsetZ = meta.offsetZ + 32768.0 * meta.scaleZ;
+
         switch (format) {
         case 0:
             ok = TiffBmpLoader::writeTiffUInt16(tiffPath, src.W, src.H,
-                                                 src.rawInt16.data(), meta, &err);
+                                                 src.rawInt16.data(), effMeta, &err);
             break;
         case 1:
             ok = TiffBmpLoader::writeTiffInt16(tiffPath, src.W, src.H,
-                                                src.rawInt16.data(), meta, &err);
+                                                src.rawInt16.data(), effMeta, &err);
             break;
         case 2:
         default:
             ok = TiffBmpLoader::writeTiffFloat32(tiffPath, src.W, src.H,
-                                                  src.rawInt16.data(), meta,
+                                                  src.rawInt16.data(), effMeta,
                                                   invalidFill32, &err);
             break;
         }

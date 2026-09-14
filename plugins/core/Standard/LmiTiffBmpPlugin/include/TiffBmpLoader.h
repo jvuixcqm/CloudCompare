@@ -252,6 +252,11 @@ namespace TiffBmpLoader
         double offsetX = 0.0, offsetY = 0.0, offsetZ = 0.0;
         //! 源是否本身是 float（32-bit float TIFF）；否则使用 rawInt16
         bool   sourceIsFloat = false;
+        //! 源是否为 16 位无符号 TIFF（非有符号）；此时 rawInt16 = pixel-32768（居中表示），
+        //! offsetZ 仍是"像素直接对应"语境（与交互式加载路径一致），两者配合使用前调用方需
+        //! 额外补偿 +32768*scaleZ（见 TiffBmpPanel::exportSourceTo），否则回算的 Z 会偏移
+        //! 32768*scaleZ mm
+        bool   sourceIsUnsignedUint16 = false;
         //! 行优先 int16 高度（SRF 与 16-bit TIFF 走这里；-32768=无效）
         std::vector<qint16> rawInt16;
         //! 行优先 mm 浮点（仅 32-bit float TIFF 源；NaN=无效）
@@ -281,8 +286,11 @@ namespace TiffBmpLoader
 
     //! 写 16-bit unsigned TIFF（SampleFormat=1，LZW + Predictor=2）：
     //! 像素 = raw_int16 + 32768（UInt16RawPlus32768；与 LMI/Gocator 约定一致，无损保留 raw_int16）
-    //! tag: ModelScaleZ = meta.scaleZ, TiepointZ = meta.offsetZ
-    //! @param rawInt16  长度=W*H 的 int16 数组（-32768=无效；行优先）
+    //! tag: ModelScaleZ = meta.scaleZ, TiepointZ = meta.offsetZ - 32768*meta.scaleZ
+    //!   （写入的 ZOffset_mm 已按"像素直接使用"语境补偿，与当前默认读取公式
+    //!    Z = pixel*scaleZ + ZOffset_mm 配套，无需再 -32768 重新解释）
+    //! @param rawInt16  长度=W*H 的 int16 数组（-32768=无效；行优先；已居中，
+    //!                  即 Z = rawInt16*meta.scaleZ + meta.offsetZ）
     bool writeTiffUInt16(const QString& path, int W, int H,
                          const qint16* rawInt16,
                          const ExportTiffMeta& meta, QString* outError = nullptr);

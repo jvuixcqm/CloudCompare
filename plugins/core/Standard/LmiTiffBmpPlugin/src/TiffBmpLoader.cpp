@@ -3752,8 +3752,13 @@ bool writeTiffUInt16(const QString& path, int W, int H, const qint16* rawInt16,
     std::vector<quint16> out(static_cast<size_t>(N));
     for (qint64 i = 0; i < N; ++i)
         out[i] = static_cast<quint16>(static_cast<int>(rawInt16[i]) + 32768);
+    // 写入的 ZOffset_mm 需与 "pixel 直接使用" 的读取公式配套（Z = pixel*scaleZ + ZOffset_mm，
+    // 不再 -32768 重新解释），而 meta.offsetZ 是按 rawInt16（已居中）语境传入的
+    // （Z = rawInt16*scaleZ + meta.offsetZ），故此处补偿 -32768*scaleZ 再写入
+    ExportTiffMeta uMeta = meta;
+    uMeta.offsetZ = meta.offsetZ - 32768.0 * meta.scaleZ;
     return writeTiffLzwLE(path, W, H, 16, 1, 2,
-                          out.data(), N * 2, meta,
+                          out.data(), N * 2, uMeta,
                           "UInt16RawPlus32768", false, 0.0, outError);
 }
 
@@ -4063,6 +4068,10 @@ bool readSourceForExport(const QString& path, ExportSourceData& out, QString* ou
         out.sourceIsFloat = false;
         const bool isSigned = info.is16BitSigned;
         const bool isPlus32768 = info.embeddedUInt16Plus32768;
+        // rawInt16 在两个非有符号分支里都是 pixel-32768（居中表示），配合的 offsetZ
+        // 需要调用方按 [[project_z_offset_uint16_fix]] 同样的语境额外补偿 +32768*scaleZ
+        // （Storage 标记不足以区分新旧生成器，因此与有符号分支同等对待，见 sourceIsUnsignedUint16 注释）
+        out.sourceIsUnsignedUint16 = !isSigned;
         for (int y = 0; y < info.height; ++y) {
             const quint16* row = reinterpret_cast<const quint16*>(img.constScanLine(y));
             for (int x = 0; x < info.width; ++x) {
